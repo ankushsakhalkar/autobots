@@ -1,0 +1,42 @@
+name: Build Autobots APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip uploaded project
+        run: |
+          ZIP=$(ls -t *.zip | head -n 1)
+          echo "Using $ZIP"
+          mkdir app && unzip -q "$ZIP" -d app
+          # handle zips that contain a single top folder
+          if [ ! -f app/pubspec.yaml ]; then
+            D=$(dirname "$(find app -name pubspec.yaml | head -n 1)")
+            mv "$D" proj && rm -rf app && mv proj app
+          fi
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build
+        working-directory: app
+        run: |
+          flutter create --platforms=android --project-name autobots --org com.ankush .
+          sed -i 's/android:label="autobots"/android:label="Autobots"/' android/app/src/main/AndroidManifest.xml
+          flutter pub get
+          dart run flutter_launcher_icons
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk ../Autobots.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Autobots-APK
+          path: Autobots.apk
